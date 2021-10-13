@@ -94,8 +94,8 @@ proxy-allowed-from:
 # here are the options:
 transcoding:
     # three possible modes of operation:
-    # (1) default: assume UTF-8, decode any invalid UTF-8 sequences as the
-    # UTF-8 encoding of the Unicode replacement character '\uFFFD'
+    # (1) default: assume UTF-8. Convert any invalid UTF-8 sequences as the
+    # UTF-8 encoding of the Unicode replacement character '\uFFFD'.
 
     # (2) assume UTF-8, on encountering invalid UTF-8 content, attempt to
     # detect its encoding via the ICU "chardet" algorithm, then decode
@@ -105,7 +105,7 @@ transcoding:
 
     # (3) assume UTF-8, on encountering invalid UTF-8 content, attempt to
     # decode using the listed encodings (referenced via their IANA names)
-    # in order. If none of them work, fall back to (1). to enable this,
+    # in order. If none of them work, fall back to (1). To enable this mode,
     # uncomment and populate the list of encodings:
     #encodings: ["windows-1252", "Shift_JIS"]
 

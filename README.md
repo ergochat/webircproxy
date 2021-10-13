@@ -7,15 +7,18 @@ This is similar to [webircgateway](https://github.com/kiwiirc/webircgateway), wi
 
 1. webircproxy implements the [official IRCv3 WebSocket specification](https://ircv3.net/specs/extensions/websocket)
 2. For clients using text (i.e., UTF-8) frames, webircproxy implements transcoding from other encodings to UTF-8
-3. Only WebSockets are supported (not SockJS or other legacy transports)
-4. A number of webircgateway features (reCAPTCHA, ACME, ident, and DNSBLs) are not supported
+3. Consequently, the `ENCODING` command from webircgateway is not implemented. Clients seeking full control over character encodings should negotiate binary frames.
+4. Only WebSockets are supported, not SockJS or other legacy transports
+5. A number of webircgateway features (reCAPTCHA, ACME, ident, and DNSBLs) are not supported
+
+webircproxy can run behind another reverse proxy, such as nginx; see the [Ergo testnet configs](https://github.com/ergochat/testnet.ergo.chat/blob/e247d9c9cb0cb5aa73e4b126061a79149356854d/nginx_https.conf#L26-L37) for an example of the relevant nginx configuration. It can also run behind a load balancer that sends the PROXY v1 or v2 header. It will pass the best available client IP address (read either from the `X-Forwarded-For` header, the PROXY protocol header, or the client's apparent originating IP address) to the upstream ircd, using the [WEBIRC command](https://ircv3.net/specs/extensions/webirc).
 
 Quick start
 -----------
 
 To build `webircproxy`, install an [up-to-date distribution of the Go language for your OS and architecture](https://golang.org/dl/). Then type `make`; this should build a binary named `webircproxy` located at the root of the project.
 
-To run `webircproxy`, provide it with a single command-line argument, the path to its config file. An example config file is provided as `default.yaml`.
+To run `webircproxy`, provide it with a single command-line argument, the path to its config file. An example config file is provided as `default.yaml`. (Most of webircproxy's functionality is documented as comments in the example config file.)
 
 Transcoding
 -----------
