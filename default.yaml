@@ -109,6 +109,11 @@ transcoding:
     # uncomment and populate the list of encodings:
     #encodings: ["windows-1252", "Shift_JIS"]
 
+# Optionally override the maximum length of the non-tags portion of the IRC line.
+# This should only be necessary if the upstream IRC server is not
+# standards-compliant. If unset, defaults to the standard value of 512:
+# max-line-len: 512
+
 # optionally expose a pprof http endpoint: https://golang.org/pkg/net/http/pprof/
 # it is strongly recommended that you don't expose this on a public interface;
 # if you need to access it remotely, you can use an SSH tunnel.
