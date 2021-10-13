@@ -1,0 +1,116 @@
+# error, warn, info, debug
+log-level: info
+
+# name of this gateway instance, sent on the WEBIRC line
+gateway-name: "webircproxy.example.com"
+
+# addresses to listen on
+listeners:
+    "127.0.0.1:8067": # (loopback ipv4, localhost-only)
+    "[::1]:8067":     # (loopback ipv6, localhost-only)
+    # If you need to serve plaintext on public interfaces, comment out the above
+    # two lines and uncomment the line below (which listens on all interfaces):
+    # ":6667":
+    # Alternately, if you have a TLS certificate issued by a recognized CA,
+    # you can configure port 6667 as an STS-only listener that only serves
+    # "redirects" to the TLS port, but doesn't allow chat. See the manual
+    # for details.
+
+    ":8097":
+        # this is a standard TLS configuration with a single certificate;
+        # see the manual for instructions on how to configure SNI
+        tls:
+            cert: fullchain.pem
+            key: privkey.pem
+        # 'proxy' should typically be false. It's for cloud load balancers that
+        # always send a PROXY protocol header ahead of the connection. See the
+        # manual ("Reverse proxies") for more details.
+        proxy: false
+        # set the minimum TLS version:
+        min-tls-version: 1.2
+
+    # Unix domain socket for proxying (e.g. from nginx):
+    "/tmp/webircproxy_sock":
+
+# sets the permissions for Unix listen sockets. on a typical Linux system,
+# the default is 0775 or 0755, which prevents other users/groups from connecting
+# to the socket. With 0777, it behaves like a normal TCP socket
+# where anyone can connect.
+unix-bind-mode: 0777
+
+# Restrict the origin of WebSocket connections by matching the "Origin" HTTP
+# header. This setting causes webircproxy to reject websocket connections unless
+# they originate from a page on one of the whitelisted websites in this list.
+# This prevents malicious websites from making their visitors connect to your
+# webircproxy instance without their knowledge. An empty list means there are no
+# restrictions.
+allowed-origins:
+    # - "https://ergo.chat"
+    # - "https://*.ergo.chat"
+
+# Upstream servers to proxy connections to (one will be chosen at random).
+# Configure WEBIRC support to inform the upstream server of the client's
+# real IP address: https://ircv3.net/specs/extensions/webirc.html
+upstreams:
+    -
+        address: "127.0.0.1:6667"
+        tls: false
+        webirc:
+            enabled: true
+            password: "oI6XTKt4CpoWlBXV9mmLzA"
+    -
+        address: "unix:/tmp/ircd_sock"
+        tls: false
+    -
+        address: "irc.example.com:6697"
+        tls: true
+        webirc:
+            enabled: true
+            password: "N75W4TnTa9-jSQaM7fvZKg"
+            # mutual TLS
+            cert: "clientcert.pem"
+            key: "clientcertkey.pem"
+
+# whether to look up user hostnames with reverse DNS; if this is disabled,
+# a string representation of the IP address will be used as the hostname
+lookup-hostnames: true
+# whether to confirm hostname lookups using "forward-confirmed reverse DNS", i.e., for
+# any hostname returned from reverse DNS, resolve it back to an IP address and reject it
+# unless it matches the connecting IP
+forward-confirm-hostnames: true
+
+# If you have another reverse proxy (such as nginx) in front of webircproxy,
+# webircproxy can read the client IP from it (from the X-Forwarded-For header
+# or PROXY protocol), then pass it on to the upstream ircd. The other reverse
+# proxy's IP must be in this list. `localhost` is shorthand for
+# 127.0.0.1/8, ::1/128, and unix sockets.
+proxy-allowed-from:
+    - localhost
+    # - "192.168.1.1"
+    # - "192.168.10.1/24"
+
+# non-UTF-8 content relayed by the upstream IRC server must be transcoded
+# to UTF-8 before it can be sent to websocket clients using text frames.
+# here are the options:
+transcoding:
+    # three possible modes of operation:
+    # (1) default: assume UTF-8, decode any invalid UTF-8 sequences as the
+    # UTF-8 encoding of the Unicode replacement character '\uFFFD'
+
+    # (2) assume UTF-8, on encountering invalid UTF-8 content, attempt to
+    # detect its encoding via the ICU "chardet" algorithm, then decode
+    # from the detected encoding and re-encode as UTF-8. On failure, fall
+    # back to (1). To enable this mode, uncomment and change to true:
+    #enable-chardet: false
+
+    # (3) assume UTF-8, on encountering invalid UTF-8 content, attempt to
+    # decode using the listed encodings (referenced via their IANA names)
+    # in order. If none of them work, fall back to (1). to enable this,
+    # uncomment and populate the list of encodings:
+    #encodings: ["windows-1252", "Shift_JIS"]
+
+# optionally expose a pprof http endpoint: https://golang.org/pkg/net/http/pprof/
+# it is strongly recommended that you don't expose this on a public interface;
+# if you need to access it remotely, you can use an SSH tunnel.
+# Leave blank or omit to disable.
+# pprof-listener: "localhost:6060"
