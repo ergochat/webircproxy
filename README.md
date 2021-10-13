@@ -35,3 +35,5 @@ BenchmarkTranscodeWithUnicodeReplacementCharacter-4    	  223276	      6310 ns/o
 BenchmarkTranscodeWithUnicodeReplacementCharacter2-4   	  329599	      3787 ns/op	    1072 B/op	       4 allocs/op
 BenchmarkUTF8Validate-4                                	 2757282	       436.5 ns/op	       0 B/op	       0 allocs/op
 ```
+
+To rerun these benchmarks on your own hardware: `make bench`.

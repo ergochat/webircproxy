@@ -1,4 +1,4 @@
-.PHONY: build install test gofmt
+.PHONY: build install test gofmt bench
 
 GIT_COMMIT := $(shell git rev-parse HEAD 2> /dev/null)
 
@@ -17,3 +17,6 @@ test:
 
 gofmt:
 	./.check-gofmt.sh --fix
+
+bench:
+	cd irc && go test -benchmem -bench .
