@@ -149,7 +149,6 @@ func tlsMinVersionFromString(version string) uint16 {
 	case "1.3":
 		return tls.VersionTLS13
 	default:
-		// tls package will fill in a sane value, currently 1.0
 		return tls.VersionTLS12
 	}
 }
