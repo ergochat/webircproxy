@@ -86,7 +86,8 @@ func (server *Server) RunReverseProxyConn(webConn *websocket.Conn, proxiedIP net
 		} // but keep going
 	}
 
-	NewReverseProxyConn(server, webConn, uConn, messageType, config.MaxLineLen, config.maxReadQBytes)
+	debug := config.logLevel >= LogLevelDebug
+	NewReverseProxyConn(server, webConn, uConn, messageType, config.MaxLineLen, config.maxReadQBytes, debug)
 }
 
 type ReverseProxyConn struct {
@@ -99,14 +100,13 @@ type ReverseProxyConn struct {
 	server *Server
 }
 
-func NewReverseProxyConn(server *Server, webConn *websocket.Conn, uConn net.Conn, messageType int, maxLineLen, maxReadQ int) *ReverseProxyConn {
+func NewReverseProxyConn(server *Server, webConn *websocket.Conn, uConn net.Conn, messageType int, maxLineLen, maxReadQ int, debug bool) *ReverseProxyConn {
 	result := &ReverseProxyConn{
 		webConn:     webConn,
 		uConn:       uConn,
 		messageType: messageType,
 		server:      server,
 	}
-	debug := server.Config().logLevel >= LogLevelDebug
 	go result.proxyToUpstream(debug)
 	go result.proxyFromUpstream(maxLineLen, maxReadQ, debug)
 	return result
