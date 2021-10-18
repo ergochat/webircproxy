@@ -39,7 +39,7 @@ func (server *Server) RunReverseProxyConn(webConn *websocket.Conn, proxiedIP net
 		messageType = websocket.BinaryMessage
 	}
 
-	server.Log(LogLevelInfo, fmt.Sprintf("Received connection from %s, forwarding to %s", ipString, upstream.Address))
+	server.Log(LogLevelInfo, fmt.Sprintf("received connection from %s, forwarding to %s", webConn.RemoteAddr(), upstream.Address))
 
 	var uConn net.Conn
 	var err error
