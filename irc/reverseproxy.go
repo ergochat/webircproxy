@@ -119,7 +119,18 @@ func (r *ReverseProxyConn) proxyToUpstream(debug bool) {
 		r.server.Log(LogLevelInfo, errorMessage)
 	}()
 
+	// XXX writev(2) / (*Buffers).WriteTo dance:
+	// net.Buffers is [][]byte. first, allocate a slice of 2 []byte's, to hold
+	// (1) the IRC line (2) the terminating CRLF
 	buffers := make(net.Buffers, 2)
+	// (*Buffers).WriteTo has two problems. (1) it destructively modifies the Buffers, i.e.
+	// the [][]byte (although not the underlying byte sequences); after a successful WriteTo
+	// the Buffers will contain an empty slice. so we need to keep a clean copy of
+	// the `buffers` slice we just allocated, pointing to 2 []byte's.
+	// (2) the net.Buffers that is the object of (*Buffers).WriteTo will escape to the heap;
+	// this is a limitation of the escape analyzer. work around this by
+	// preemptively allocating it a single time on the heap and reusing it:
+	iovec := new(net.Buffers)
 	for {
 		_, line, err := r.webConn.ReadMessage()
 		if err != nil {
@@ -131,11 +142,13 @@ func (r *ReverseProxyConn) proxyToUpstream(debug bool) {
 				fmt.Sprintf("input: %s -> %s: %s",
 					r.webConn.RemoteAddr().String(), r.uConn.RemoteAddr().String(), line))
 		}
-		iovec := buffers
-		iovec[0] = line
-		iovec[1] = crlf
-		// Go will optimize this to writev(2) if possible
-		_, err = (&iovec).WriteTo(r.uConn)
+		// step 1: reset *iovec to contain a slice of 2 []byte's:
+		*iovec = buffers
+		// step 2: fill in the two desired []byte's:
+		(*iovec)[0] = line
+		(*iovec)[1] = crlf
+		// step 3: (*net.Buffers) prepared, Go will optimize this to writev(2) if possible:
+		_, err = iovec.WriteTo(r.uConn)
 		if err != nil {
 			errorMessage = fmt.Sprintf("error writing to upstream conn at %s: %v", r.uConn.RemoteAddr().String(), err)
 			return
