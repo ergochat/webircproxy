@@ -6,6 +6,7 @@ package irc
 import (
 	"crypto/tls"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"strings"
@@ -94,6 +95,9 @@ type ReverseProxyConn struct {
 	webConn     *websocket.Conn
 	uConn       net.Conn
 	messageType int
+	wsBuffer    []byte
+	maxBuffer   int
+	maxLineLen  int
 
 	closeOnce sync.Once
 
@@ -106,9 +110,12 @@ func NewReverseProxyConn(server *Server, webConn *websocket.Conn, uConn net.Conn
 		uConn:       uConn,
 		messageType: messageType,
 		server:      server,
+		wsBuffer:    make([]byte, initialBufferSize),
+		maxBuffer:   maxReadQ,
+		maxLineLen:  maxLineLen,
 	}
 	go result.proxyToUpstream(debug)
-	go result.proxyFromUpstream(maxLineLen, maxReadQ, debug)
+	go result.proxyFromUpstream(debug)
 	return result
 }
 
@@ -132,7 +139,7 @@ func (r *ReverseProxyConn) proxyToUpstream(debug bool) {
 	// preemptively allocating it a single time on the heap and reusing it:
 	iovec := new(net.Buffers)
 	for {
-		_, line, err := r.webConn.ReadMessage()
+		line, err := r.readWSMessage()
 		if err != nil {
 			errorMessage = fmt.Sprintf("error reading from websocket conn at %s: %v", r.webConn.RemoteAddr().String(), err)
 			return
@@ -156,7 +163,36 @@ func (r *ReverseProxyConn) proxyToUpstream(debug bool) {
 	}
 }
 
-func (r *ReverseProxyConn) proxyFromUpstream(maxLineLen, maxReadQ int, debug bool) {
+func (r *ReverseProxyConn) readWSMessage() (line []byte, err error) {
+	_, reader, err := r.webConn.NextReader()
+	if err != nil {
+		return nil, err
+	}
+	// XXX this is io.ReadFull with a single attempt to resize upwards
+	n, err := io.ReadFull(reader, r.wsBuffer)
+	if err == nil && len(r.wsBuffer) < r.maxBuffer {
+		newBuf := make([]byte, r.maxBuffer)
+		copy(newBuf, r.wsBuffer[:n])
+		r.wsBuffer = newBuf
+		var n2 int
+		n2, err = io.ReadFull(reader, r.wsBuffer[n:])
+		n += n2
+	}
+	line = r.wsBuffer[:n]
+	switch err {
+	case io.ErrUnexpectedEOF, io.EOF:
+		// good: exhausted the reader without exhausting the buffer
+		return line, nil
+	case nil, websocket.ErrReadLimit:
+		// bad: exhausted the buffer but the reader still has data
+		return line, websocket.ErrReadLimit
+	default:
+		// bad: read error
+		return line, err
+	}
+}
+
+func (r *ReverseProxyConn) proxyFromUpstream(debug bool) {
 	var errorMessage string
 	defer func() {
 		r.Close()
@@ -167,7 +203,7 @@ func (r *ReverseProxyConn) proxyFromUpstream(maxLineLen, maxReadQ int, debug boo
 	defer r.server.HandlePanic()
 
 	var reader ircreader.Reader
-	reader.Initialize(r.uConn, initialBufferSize, maxReadQ)
+	reader.Initialize(r.uConn, initialBufferSize, r.maxBuffer)
 	for {
 		// ircreader strips the \r\n:
 		line, err := reader.ReadLine()
@@ -183,7 +219,7 @@ func (r *ReverseProxyConn) proxyFromUpstream(maxLineLen, maxReadQ int, debug boo
 		if r.messageType == websocket.BinaryMessage {
 			err = r.webConn.WriteMessage(websocket.BinaryMessage, line)
 		} else {
-			err = r.webConn.WriteMessage(websocket.TextMessage, r.server.transcodeToUTF8(line, maxLineLen))
+			err = r.webConn.WriteMessage(websocket.TextMessage, r.server.transcodeToUTF8(line, r.maxLineLen))
 		}
 		if err != nil {
 			errorMessage = fmt.Sprintf("error writing to websocket conn at %s: %v", r.webConn.RemoteAddr().String(), err)
